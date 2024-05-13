@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "XM Simple Survey"
 include(":app")
- 
+include(":questions")
