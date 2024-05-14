@@ -15,7 +15,6 @@ class QuestionsViewModel(private val questionsApi: XMQuestionsApi) : ViewModel()
     private val _state = MutableStateFlow(QuestionsScreenState())
     val state: StateFlow<QuestionsScreenState>
         get() = _state
-    val questionsRepository = ""
 
     init {
         handleIntent()
@@ -23,17 +22,28 @@ class QuestionsViewModel(private val questionsApi: XMQuestionsApi) : ViewModel()
 
     private fun handleIntent() {
         viewModelScope.launch {
-            userIntent.consumeAsFlow().collect {
-                when (it) {
+            userIntent.consumeAsFlow().collect { intent ->
+                when (intent) {
                     QuestionsIntent.LoadQuestions -> {
                         loadQuestions()
                     }
                     is SubmitQuestion -> {
-
+                        _state.update { _state.value.copy(currentQuestion = intent.question) }
+                        updateQuestionList(intent.question)
+                        submitQuestion(intent.question)
                     }
                 }
             }
         }
+    }
+
+    private fun updateQuestionList(question: Question) {
+        val questionsToUpdate = _state.value.questions.toMutableList()
+        val index = questionsToUpdate.indexOfFirst { it.id == question.id }
+        if (index != -1) {
+            questionsToUpdate[index] = question
+        }
+        _state.update { _state.value.copy(questions = questionsToUpdate.toList()) }
     }
 
     private fun loadQuestions() {
@@ -42,9 +52,28 @@ class QuestionsViewModel(private val questionsApi: XMQuestionsApi) : ViewModel()
             val response = questionsApi.getQuestions()
             if (response.isSuccessful) {
                 val questions = response.body()?.toVmQuestions() ?: listOf(Question(-1, "server choose ignorance today"))
-                _state.update { _state.value.copy(questionsLoadingState = QuestionsLoadingState.Success(questions)) }
+                _state.update {
+                    _state.value.copy(
+                        questions = questions,
+                        questionsLoadingState = QuestionsLoadingState.Success
+                    )
+                }
             } else {
-                _state.update { _state.value.copy(questionsLoadingState = QuestionsLoadingState.Error(response.message())) }
+                _state.update { _state.value.copy(questionsLoadingState = QuestionsLoadingState.Error) }
+            }
+        }
+    }
+
+    private fun submitQuestion(question: Question) {
+        viewModelScope.launch {
+            _state.update { _state.value.copy(questionSubmissionState = QuestionSubmissionState.Loading) }
+            val response = questionsApi.submitQuestion(QuestionSubmissionDto(question.id, question.answerText))
+            if (response.isSuccessful) {
+                val submittedQuestion = question.copy(isQuestionSubmitted = true)
+                updateQuestionList(submittedQuestion)
+                _state.update { _state.value.copy(questionSubmissionState = QuestionSubmissionState.Success) }
+            } else {
+                _state.update { _state.value.copy(questionSubmissionState = QuestionSubmissionState.Error) }
             }
         }
     }
@@ -53,13 +82,8 @@ class QuestionsViewModel(private val questionsApi: XMQuestionsApi) : ViewModel()
 data class QuestionsScreenState(
     val questionsLoadingState: QuestionsLoadingState = QuestionsLoadingState.Idle,
     val questions: List<Question> = listOf(),
-    val questionSubmissionScreenState: QuestionSubmissionScreenState? = null,
+    val questionSubmissionState: QuestionSubmissionState = QuestionSubmissionState.Idle,
     val currentQuestion: Question? = null
-)
-
-data class QuestionSubmissionScreenState(
-    val question: Question,
-    val questionSubmissionState: QuestionSubmissionState
 )
 
 sealed class QuestionsIntent {
@@ -70,15 +94,15 @@ sealed class QuestionsIntent {
 sealed class QuestionsLoadingState {
     data object Idle : QuestionsLoadingState()
     data object Loading : QuestionsLoadingState()
-    data class Success(val questions: List<Question>) : QuestionsLoadingState()
-    data class Error(val error: String?) : QuestionsLoadingState()
+    data object Success : QuestionsLoadingState()
+    data object Error : QuestionsLoadingState()
 }
 
 sealed class QuestionSubmissionState {
     data object Idle : QuestionSubmissionState()
     data object Loading : QuestionSubmissionState()
     data object Success : QuestionSubmissionState()
-    data class Error(val error: String?) : QuestionSubmissionState()
+    data object Error : QuestionSubmissionState()
 }
 
 data class Question(
