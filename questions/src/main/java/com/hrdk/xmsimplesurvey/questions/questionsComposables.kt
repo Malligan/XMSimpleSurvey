@@ -243,6 +243,16 @@ fun ViewPagerItem(screenState: State<QuestionsScreenState>, question: Question, 
             }
         }
 
+        val submitButtonText  = remember {
+            derivedStateOf {
+                if (isQuestionSubmitted.value) {
+                    "Already submitted"
+                } else {
+                    "Submit"
+                }
+            }
+        }
+
         Button(
             modifier = Modifier
                 .fillMaxWidth()
@@ -252,7 +262,7 @@ fun ViewPagerItem(screenState: State<QuestionsScreenState>, question: Question, 
                 onClick.invoke(answerTextFieldState.value)
             }
         ) {
-            Text(text = "Submit")
+            Text(text = submitButtonText.value)
         }
     }
 }

@@ -71,6 +71,7 @@ class QuestionsViewModel(private val questionsApi: XMQuestionsApi) : ViewModel()
             if (response.isSuccessful) {
                 val submittedQuestion = question.copy(isQuestionSubmitted = true)
                 updateQuestionList(submittedQuestion)
+                _state.update { _state.value.copy(currentQuestion = submittedQuestion) }
                 _state.update { _state.value.copy(questionSubmissionState = QuestionSubmissionState.Success) }
             } else {
                 _state.update { _state.value.copy(questionSubmissionState = QuestionSubmissionState.Error) }
